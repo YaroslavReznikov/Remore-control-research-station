@@ -9,7 +9,12 @@ const App = () => {
   });
 
   // Fetch sensor data from ESP
+  useEffect(() => {
+    getData(); // Initial fetch immediately
+    const interval = setInterval(getData, 2000); // Every 2 seconds
 
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, []);
   // Send movement command to E
   const sendCommand = async (command) => {
     try {
@@ -24,6 +29,22 @@ const App = () => {
     }
   };
 
+  const getData = async () => {
+    try {
+      console.log("Asked");
+      const response = await fetch("http://192.168.204.92/control", {
+        method: "GET"
+      });
+  
+      const data = await response.json();
+      setSensorData(data);
+      console.log("Data gotten")
+      console.log(data)
+    } catch (error) {
+      console.error("Error getting data", error);
+    }
+  };
+
 
   return (
     <div className="p-4">
@@ -32,7 +53,7 @@ const App = () => {
       <div className="flex flex-col items-center gap-4">
         <button onClick={() => sendCommand("forward")} className="px-6">Forward</button>
         <div className="flex gap-4">
-          <button onClick={() => sendCommand("left")} className="px-6">Left</button>
+          <button onClick={() => getData()} className="px-6">Left</button>
           <button onClick={() => sendCommand("right")} className="px-6">Right</button>
         </div>
         <button onClick={() => sendCommand("back")} className="px-6">Back</button>

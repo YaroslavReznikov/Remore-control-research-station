@@ -1,7 +1,7 @@
 #include <DHT.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-
+#include <SoftwareSerial.h>
 #define FORWARD_LEFT_WHEEL 4
 #define FORWARD_RIGHT_WHEEL 4
 #define BACK_LEFT_WHEEL 4
@@ -17,7 +17,7 @@
 #define LightConstantResistor 250
 DHT dht(temperaturePin, DHT11);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-
+SoftwareSerial espSerial(12, 14); // RX, TX – match this to your wiring
 bool direction = 1;
 float duration, distance;
 float temperature;
@@ -33,26 +33,34 @@ void setup() {
   lcd.init();           
   lcd.backlight();       
   lcd.setCursor(0, 0);   
-  lcd.print("");
+  lcd.print("");     
   lcd.setCursor(0, 1);   
   lcd.print("");
 
 }
 
+
 void loop() {
   CalculateDistance();
   temperature = dht.readTemperature();
-  lcd.setCursor(0, 0);   
-  lcd.print(distance);
-  lcd.print("cm");
-  lcd.setCursor(0, 1);   
   CalculateLight();
 
-  lcd.print(lightLevel);
-  Serial.print("Light level:");
-  Serial.println(lightLevel);
-  
-  delay(1000);
+  if (espSerial.available()) {
+    String inputString = espSerial.readStringUntil('\n');
+    inputString.trim();
+
+    if (inputString == "SEND") {
+      espSerial.print(temperature);
+      espSerial.print(",");
+      espSerial.print(lightLevel);
+      espSerial.print(",");
+      espSerial.print(2); // replace 2 with actual gasLevel if needed
+      espSerial.print(",");
+      espSerial.println(distance);
+    }
+  }
+
+  delay(200);  // Optional: allows time for commands to come in
 }
 
 void CalculateLight(){
@@ -62,7 +70,7 @@ void CalculateLight(){
   float voltage = adcValue * 5/1023;
   float R_sensor = LightConstantResistor * (voltage / (5.0 - voltage));
   Serial.println(voltage);
-    Serial.println(R_sensor);
+    Serial.println(adcValue);
   if(R_sensor !=0)  lightLevel = 500 * pow(R_sensor, -1.4); 
 
 }
