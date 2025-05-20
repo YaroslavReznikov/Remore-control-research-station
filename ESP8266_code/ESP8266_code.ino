@@ -4,7 +4,9 @@
 #include <ArduinoJson.h>
 
 #define Interval 1000  // 1 second
-SoftwareSerial arduinoSerial(12, 14); // RX, TX (connect to Arduino TX, RX)
+#define DATA_REQUEST_PIN 16  // D0 (GPIO16)
+
+SoftwareSerial arduinoSerial(13, 15); // RX, TX (connect to Arduino TX, RX)
 String inputString = "";
 unsigned long lastMillis = 0;
 
@@ -72,14 +74,22 @@ void handleOptions() {
 }
 
 void getData() {
-  arduinoSerial.println("SEND");  // Request data
+    pinMode(DATA_REQUEST_PIN, OUTPUT);
+  digitalWrite(DATA_REQUEST_PIN, HIGH);  // 🔼 Ask for data
+
   unsigned long timeout = millis();
   while (!arduinoSerial.available()) {
-    if (millis() - timeout > 500) return; // Timeout after 500ms
+    if (millis() - timeout > 500){
+      Serial.println("Got canceled");
+        digitalWrite(DATA_REQUEST_PIN, LOW); 
+      return;
+    } // Timeout after 500ms
   }
-
   inputString = arduinoSerial.readStringUntil('\n');
   inputString.trim();
+  Serial.println(inputString);
+  digitalWrite(DATA_REQUEST_PIN, LOW);  // 🔼 Ask for data
+
   parseData(inputString);
 }
 
@@ -106,7 +116,7 @@ void parseData(String data) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(115200 );
   arduinoSerial.begin(9600);
 
   WiFi.begin(ssid, password);
@@ -130,10 +140,8 @@ void setup() {
 
 void loop() {
   unsigned long currentMillis = millis();
-  if (currentMillis - lastMillis >= Interval) {
-    lastMillis = currentMillis;
-    getData();  // Update data every second
+  if (millis() - lastMillis > Interval) {
+    lastMillis = millis();
+    getData();
   }
-
-  server.handleClient();
 }

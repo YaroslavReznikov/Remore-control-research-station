@@ -15,9 +15,11 @@
 #define gasSensorPin A0
 #define LightSensorPin A3
 #define LightConstantResistor 250
+#define REQUEST_PIN 10 
+
 DHT dht(temperaturePin, DHT11);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-SoftwareSerial espSerial(12, 14); // RX, TX – match this to your wiring
+SoftwareSerial espSerial(11, 12); // RX, TX – match this to your wiring
 bool direction = 1;
 float duration, distance;
 float temperature;
@@ -28,6 +30,8 @@ void setup() {
   pinMode(trigPin, OUTPUT);
   dht.begin();
   pinMode(echoPin, INPUT);
+    pinMode(REQUEST_PIN, INPUT); 
+
   Serial.begin(9600);
   Serial.println("start of the program");
   lcd.init();           
@@ -41,26 +45,23 @@ void setup() {
 
 
 void loop() {
-  CalculateDistance();
-  temperature = dht.readTemperature();
-  CalculateLight();
+  Serial.println(digitalRead(REQUEST_PIN) );
+  if (digitalRead(REQUEST_PIN) == HIGH) {
+    CalculateDistance();
+    temperature = dht.readTemperature();
+    CalculateLight();
 
-  if (espSerial.available()) {
-    String inputString = espSerial.readStringUntil('\n');
-    inputString.trim();
-
-    if (inputString == "SEND") {
-      espSerial.print(temperature);
-      espSerial.print(",");
-      espSerial.print(lightLevel);
-      espSerial.print(",");
-      espSerial.print(2); // replace 2 with actual gasLevel if needed
-      espSerial.print(",");
-      espSerial.println(distance);
-    }
+    espSerial.print(temperature);
+    espSerial.print(",");
+    espSerial.print(lightLevel);  
+    espSerial.print(",");
+    espSerial.print(2); // replace with real gas level
+    espSerial.print(",");
+    espSerial.println(distance);
+    delay(500);
   }
 
-  delay(200);  // Optional: allows time for commands to come in
+  delay(100);  // Debounce / prevent repeated sends
 }
 
 void CalculateLight(){
@@ -69,8 +70,6 @@ void CalculateLight(){
 
   float voltage = adcValue * 5/1023;
   float R_sensor = LightConstantResistor * (voltage / (5.0 - voltage));
-  Serial.println(voltage);
-    Serial.println(adcValue);
   if(R_sensor !=0)  lightLevel = 500 * pow(R_sensor, -1.4); 
 
 }
