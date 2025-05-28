@@ -1,111 +1,252 @@
+// ======================== Includes and Defines ========================
 #include <DHT.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <SoftwareSerial.h>
-#define FORWARD_LEFT_WHEEL 4
-#define FORWARD_RIGHT_WHEEL 4
-#define BACK_LEFT_WHEEL 4
-#define BACK_RIGHT_WHEEL 4
-#define MAX_PWM 255
-#define MIN_PWM 100
-#define DHT11PIN 8
-#define trigPin 2
-#define echoPin 4
-#define temperaturePin 8
-#define gasSensorPin A0
-#define LightSensorPin A3
-#define LightConstantResistor 250
-#define REQUEST_PIN 10 
 
-DHT dht(temperaturePin, DHT11);
+#define DHT_PIN 8
+#define DHT_TYPE DHT11
+#define TRIG_PIN 2
+#define ECHO_PIN 4
+#define GAS_SENSOR_PIN A2
+#define LIGHT_SENSOR_PIN A3
+#define LIGHT_REF_RESISTOR 250
+
+#define RX_PIN 11
+#define TX_PIN 12
+#define REQUEST_PIN 3
+
+#define RIGHT_WHEEL_PWM 5
+#define RIGHT_PIN1 7
+#define RIGHT_PIN2 13
+
+#define LEFT_WHEEL_PWM 6
+#define LEFT_PIN1 A1
+#define LEFT_PIN2 A0
+
+#define MAXPWM 255
+#define MINPWM 150
+#define MAX_QUEUE_SIZE 10
+#define MOTOR_DURATION 1000
+
+
+
+
+// ======================== Global Instances ========================
+DHT dht(DHT_PIN, DHT_TYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-SoftwareSerial espSerial(11, 12); // RX, TX – match this to your wiring
-bool direction = 1;
-float duration, distance;
-float temperature;
-float lightLevel = 0;
-void setup() {
-  pinMode(LightSensorPin, INPUT);
-  pinMode(gasSensorPin, INPUT);
-  pinMode(trigPin, OUTPUT);
-  dht.begin();
-  pinMode(echoPin, INPUT);
-    pinMode(REQUEST_PIN, INPUT); 
+SoftwareSerial arduinoEsp(11, 12); //rx tx
+SoftwareSerial espArduino(10, 9);
 
-  Serial.begin(9600);
-  Serial.println("start of the program");
-  lcd.init();           
-  lcd.backlight();       
-  lcd.setCursor(0, 0);   
-  lcd.print("");     
-  lcd.setCursor(0, 1);   
-  lcd.print("");
+float temperature, distance, lightLevel;
+bool direction = true, commandReceived = false;
+uint8_t motorCommandQueue[MAX_QUEUE_SIZE];
+int queueStart = 0;
+int queueEnd = 0;
+bool motorBusy = false;
+unsigned long motorStartTime = 0;
+uint8_t currentMotorCommand;
 
+// ======================== Setup ========================
+void setupPins() {
+  pinMode(LIGHT_SENSOR_PIN, INPUT);
+  pinMode(GAS_SENSOR_PIN, INPUT);
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(REQUEST_PIN, INPUT);
+  pinMode(RIGHT_PIN1, OUTPUT);
+  pinMode(RIGHT_PIN2, OUTPUT);
+  pinMode(LEFT_PIN1, OUTPUT);
+  pinMode(LEFT_PIN2, OUTPUT);
+  pinMode(RIGHT_WHEEL_PWM, OUTPUT);
+  pinMode(LEFT_WHEEL_PWM, OUTPUT);
+
+  attachInterrupt(digitalPinToInterrupt(REQUEST_PIN), commandHandlerFlag, RISING);
 }
 
+void setupLCD() {
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  showInternetDisconnected();
+}
 
+void setup() {
+  moveForward();
+  setupPins();
+  setupLCD();
+  dht.begin();
+  Serial.begin(4800);
+  arduinoEsp.begin(9600);
+  espArduino.begin(9600);
+  Serial.println("Program Started");
+}
+
+// ======================== Main Loop ========================
 void loop() {
-  Serial.println(digitalRead(REQUEST_PIN) );
-  if (digitalRead(REQUEST_PIN) == HIGH) {
-    CalculateDistance();
-    temperature = dht.readTemperature();
-    CalculateLight();
-
-    espSerial.print(temperature);
-    espSerial.print(",");
-    espSerial.print(lightLevel);  
-    espSerial.print(",");
-    espSerial.print(2); // replace with real gas level
-    espSerial.print(",");
-    espSerial.println(distance);
-    delay(500);
+  if (commandReceived) {
+    commandReceived = false;
+    commandHandler();
   }
 
-  delay(100);  // Debounce / prevent repeated sends
+  if (motorBusy && millis() - motorStartTime >= MOTOR_DURATION && queueStart == queueEnd) {
+    stopMotors();
+    motorBusy = false;
+  }
+
+  if ( queueStart != queueEnd) {
+    currentMotorCommand = motorCommandQueue[queueStart];
+    queueStart = (queueStart + 1) % MAX_QUEUE_SIZE;
+    executeMotorCommand(currentMotorCommand);
+  }
+
+
+  delay(8);
 }
 
-void CalculateLight(){
-  lightLevel = 0;
-  float adcValue = analogRead(LightSensorPin);
-
-  float voltage = adcValue * 5/1023;
-  float R_sensor = LightConstantResistor * (voltage / (5.0 - voltage));
-  if(R_sensor !=0)  lightLevel = 500 * pow(R_sensor, -1.4); 
-
+// ======================== Interrupt Handler ========================
+void commandHandlerFlag() {
+  commandReceived = true;
 }
 
-void CalculateDistance(){
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
-  distance = (duration*.0343)/2;
+void commandHandler() {
+  Serial.println("Interrupt Received");
+  int command = espArduino.read();
+  Serial.print("Command: "); 
+  Serial.println(command, HEX);
+  switch (command & 0xF0) {
+    case 0x00: sendSensorData(); break;
+    case 0x10: handleMotorCommand(command); break;
+    case 0x20: handleLCDCommand(command); break;
+    default: Serial.println("Unknown command");
+  }
 }
 
-void left(){
-  analogWrite(FORWARD_LEFT_WHEEL, MAX_PWM);
-  analogWrite(BACK_LEFT_WHEEL, MAX_PWM);
-  analogWrite(FORWARD_RIGHT_WHEEL, MIN_PWM);
-  analogWrite(BACK_RIGHT_WHEEL, MIN_PWM);
+// ======================== Sensor Functions ========================
+void readDistance() {
+  digitalWrite(TRIG_PIN, LOW); delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH); delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  float duration = pulseIn(ECHO_PIN, HIGH);
+  distance = (duration * 0.0343) / 2;
 }
-void right(){
-  analogWrite(FORWARD_LEFT_WHEEL, MIN_PWM);
-  analogWrite(BACK_LEFT_WHEEL, MIN_PWM);
-  analogWrite(FORWARD_RIGHT_WHEEL, MAX_PWM);
-  analogWrite(BACK_RIGHT_WHEEL, MAX_PWM);
+
+void readLightLevel() {
+  float adcValue = analogRead(LIGHT_SENSOR_PIN);
+  float voltage = adcValue * 5.0 / 1023;
+  float resistance = LIGHT_REF_RESISTOR * (voltage / (5.0 - voltage));
+  lightLevel = (resistance != 0) ? 500 * pow(resistance, -1.4) : 0;
 }
-void forward(){
-  analogWrite(FORWARD_LEFT_WHEEL, MAX_PWM);
-  analogWrite(BACK_LEFT_WHEEL, MAX_PWM);
-  analogWrite(FORWARD_RIGHT_WHEEL, MAX_PWM);
-  analogWrite(BACK_RIGHT_WHEEL, MAX_PWM);
+
+float readGasLevel() {
+  return 2;
 }
-void back(){
-  direction = 0;
-  analogWrite(FORWARD_LEFT_WHEEL, MAX_PWM);
-  analogWrite(BACK_LEFT_WHEEL, MAX_PWM);
-  analogWrite(FORWARD_RIGHT_WHEEL, MAX_PWM);
-  analogWrite(BACK_RIGHT_WHEEL, MAX_PWM);
+
+// ======================== Communication Handlers ========================
+void sendSensorData() {
+  readDistance();
+  temperature = dht.readTemperature();
+  readLightLevel();
+  float gasLevel = readGasLevel();
+  String dataString = String(temperature) + "," +
+                      String(lightLevel) + "," +
+                      String(gasLevel) + "," +
+                      String(distance) + "\n";
+  arduinoEsp.print(dataString);
+}
+
+void handleMotorCommand(uint8_t command) {
+  if ((queueEnd + 1) % MAX_QUEUE_SIZE == queueStart) return;
+  motorCommandQueue[queueEnd] = command;
+  queueEnd = (queueEnd + 1) % MAX_QUEUE_SIZE;
+}
+
+void handleLCDCommand(uint8_t command) {
+  switch (command) {
+    case 0x20: showInternetConnected(); break;
+    case 0x21: showInternetDisconnected(); break;
+    case 0x22: showErrorOnLCD(); break;
+    case 0x23: showDataErrorOnLCD(); break;
+    default: Serial.println("Unknown LCD command");
+  }
+}
+
+// ======================== Motor Control ========================
+void executeMotorCommand(uint8_t command) {
+  switch (command & 0x0F) {
+    case 0x10: moveForward(); break;
+    case 0x11: moveBackward(); break;
+    case 0x12: moveLeft(); break;
+    case 0x13: moveRight(); break;
+    case 0x14: stopMotors(); break;
+  }
+  motorStartTime = millis();
+  motorBusy = true;
+}
+
+void moveForward() {
+  digitalWrite(RIGHT_PIN1, HIGH); digitalWrite(RIGHT_PIN2, LOW);
+  digitalWrite(LEFT_PIN1, HIGH);  digitalWrite(LEFT_PIN2, LOW);
+  analogWrite(RIGHT_WHEEL_PWM, MAXPWM);
+  analogWrite(LEFT_WHEEL_PWM, MAXPWM);
+}
+
+void moveBackward() {
+  digitalWrite(RIGHT_PIN1, LOW); digitalWrite(RIGHT_PIN2, HIGH);
+  digitalWrite(LEFT_PIN1, LOW);  digitalWrite(LEFT_PIN2, HIGH);
+  analogWrite(RIGHT_WHEEL_PWM, MAXPWM);
+  analogWrite(LEFT_WHEEL_PWM, MAXPWM);
+}
+
+void moveLeft() {
+  digitalWrite(RIGHT_PIN1, HIGH); digitalWrite(RIGHT_PIN2, LOW);
+  digitalWrite(LEFT_PIN1, LOW);  digitalWrite(LEFT_PIN2, HIGH);
+  analogWrite(RIGHT_WHEEL_PWM, MINPWM);
+  analogWrite(LEFT_WHEEL_PWM, MAXPWM);
+}
+
+void moveRight() {
+  digitalWrite(RIGHT_PIN1, LOW); digitalWrite(RIGHT_PIN2, HIGH);
+  digitalWrite(LEFT_PIN1, HIGH); digitalWrite(LEFT_PIN2, LOW);
+  analogWrite(RIGHT_WHEEL_PWM, MAXPWM);
+  analogWrite(LEFT_WHEEL_PWM, MINPWM);
+}
+
+void stopMotors() {
+  digitalWrite(RIGHT_PIN1, LOW); digitalWrite(RIGHT_PIN2, LOW);
+  digitalWrite(LEFT_PIN1, LOW);  digitalWrite(LEFT_PIN2, LOW);
+  analogWrite(RIGHT_WHEEL_PWM, 0);
+  analogWrite(LEFT_WHEEL_PWM, 0);
+}
+
+// ======================== LCD Status Functions ========================
+void showInternetConnected() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Internet Status:");
+  lcd.setCursor(0, 1);
+  lcd.print("Connected");
+}
+
+void showInternetDisconnected() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Internet Status:");
+  lcd.setCursor(0, 1);
+  lcd.print("Disconnected");
+}
+
+void showErrorOnLCD() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ERROR:");
+  lcd.setCursor(0, 1);
+  lcd.print("Check sensors!");
+}
+void showDataErrorOnLCD(){
+    lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ERROR:");
+  lcd.setCursor(0, 1);
+  lcd.print("Getting data");
 }
