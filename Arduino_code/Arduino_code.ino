@@ -6,14 +6,14 @@
 
 #define DHT_PIN 8
 #define DHT_TYPE DHT11
-#define TRIG_PIN 2
-#define ECHO_PIN 4
+#define TRIG_PIN 12
+#define ECHO_PIN 13
 #define GAS_SENSOR_PIN A2
 #define LIGHT_SENSOR_PIN A3
 #define LIGHT_REF_RESISTOR 250
 
-#define RX_PIN 11
-#define TX_PIN 12
+#define RX_PIN 4
+#define TX_PIN 2
 #define REQUEST_PIN 3
 
 #define RIGHT_WHEEL_PWM 5
@@ -27,7 +27,7 @@
 #define MAXPWM 255
 #define MINPWM 150
 #define MAX_QUEUE_SIZE 10
-#define MOTOR_DURATION 1000
+#define MOTOR_DURATION 10000
 
 
 
@@ -35,8 +35,7 @@
 // ======================== Global Instances ========================
 DHT dht(DHT_PIN, DHT_TYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-SoftwareSerial arduinoEsp(11, 12); //rx tx
-SoftwareSerial espArduino(10, 9);
+SoftwareSerial SerialCommunication(RX_PIN, TX_PIN); 
 
 float temperature, distance, lightLevel;
 bool direction = true, commandReceived = false;
@@ -72,14 +71,13 @@ void setupLCD() {
 }
 
 void setup() {
-  moveForward();
   setupPins();
   setupLCD();
   dht.begin();
   Serial.begin(4800);
-  arduinoEsp.begin(9600);
-  espArduino.begin(9600);
+  SerialCommunication.begin(9600);
   Serial.println("Program Started");
+  
 }
 
 // ======================== Main Loop ========================
@@ -90,18 +88,20 @@ void loop() {
   }
 
   if (motorBusy && millis() - motorStartTime >= MOTOR_DURATION && queueStart == queueEnd) {
+    Serial.println("Finished doing motor command");
     stopMotors();
     motorBusy = false;
   }
 
-  if ( queueStart != queueEnd) {
+  if ( queueStart != queueEnd && motorBusy && millis() - motorStartTime >= MOTOR_DURATION) {
     currentMotorCommand = motorCommandQueue[queueStart];
     queueStart = (queueStart + 1) % MAX_QUEUE_SIZE;
+    Serial.println("Staered doing new motor command");
     executeMotorCommand(currentMotorCommand);
   }
 
 
-  delay(8);
+  delay(1);
 }
 
 // ======================== Interrupt Handler ========================
@@ -111,7 +111,8 @@ void commandHandlerFlag() {
 
 void commandHandler() {
   Serial.println("Interrupt Received");
-  int command = espArduino.read();
+  delay(1);
+  int command = SerialCommunication.read();
   Serial.print("Command: "); 
   Serial.println(command, HEX);
   switch (command & 0xF0) {
@@ -152,7 +153,7 @@ void sendSensorData() {
                       String(lightLevel) + "," +
                       String(gasLevel) + "," +
                       String(distance) + "\n";
-  arduinoEsp.print(dataString);
+  SerialCommunication.print(dataString);
 }
 
 void handleMotorCommand(uint8_t command) {
@@ -162,26 +163,26 @@ void handleMotorCommand(uint8_t command) {
 }
 
 void handleLCDCommand(uint8_t command) {
-  switch (command) {
-    case 0x20: showInternetConnected(); break;
-    case 0x21: showInternetDisconnected(); break;
-    case 0x22: showErrorOnLCD(); break;
-    case 0x23: showDataErrorOnLCD(); break;
+  switch (command 0x0F) {
+    case 0x0: showInternetConnected(); break;
+    case 0x1: showInternetDisconnected(); break;
+    case 0x2: showErrorOnLCD(); break;
+    case 0x3: showDataErrorOnLCD(); break;
     default: Serial.println("Unknown LCD command");
   }
 }
 
 // ======================== Motor Control ========================
 void executeMotorCommand(uint8_t command) {
-  switch (command & 0x0F) {
-    case 0x10: moveForward(); break;
-    case 0x11: moveBackward(); break;
-    case 0x12: moveLeft(); break;
-    case 0x13: moveRight(); break;
-    case 0x14: stopMotors(); break;
-  }
   motorStartTime = millis();
   motorBusy = true;
+  switch (command & 0x0F) {
+    case 0x0: moveForward(); break;
+    case 0x1: moveBackward(); break;
+    case 0x2: moveLeft(); break;
+    case 0x3: moveRight(); break;
+    case 0x4: stopMotors(); break;
+  }
 }
 
 void moveForward() {
