@@ -1,20 +1,21 @@
+//pin 13 = 5
+
 // ======================== Includes and Config ========================
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <SoftwareSerial.h>
+#include <WiFi.h>
+#include <WebServer.h>
 #include <ArduinoJson.h>
 
 // WiFi Credentials
-#define  ssid  "Redmi Note 12"
-#define  password  "yaros5lav"
+#define ssid "Redmi Note 12"
+#define password "yaros5lav"
 
 // GPIO Assignments
-#define COMMAND_SEND_PIN 16  // D0
-#define DATA_REQUEST_PIN 5   // D1
+#define COMMAND_SEND_PIN 18
 
-// Communication
-SoftwareSerial arduinoEsp(12, 14); // RX, TX
-SoftwareSerial espArduino(3, 1); // TX, RX
+// Use hardware serial for communication (Serial1)
+#define RX_PIN 4
+#define TX_PIN 5
+HardwareSerial SerialCommunication(1);  // Use UART1
 
 void getData();
 void sendCommand(uint8_t command);
@@ -30,17 +31,15 @@ float gasLevel = 0;
 float distance = 0;
 
 // Web Server
-ESP8266WebServer server(80);
+WebServer server(80);
 
 // Raw Serial Input
 String inputString = "";
 
-
-
 // ======================== Web Server Handlers ========================
 void handleGet() {
   getData();
-  
+
   StaticJsonDocument<200> doc;
   doc["temperature"] = temperature;
   doc["light"] = lightLevel;
@@ -71,23 +70,14 @@ void handlePost() {
   String command = doc["command"];
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", "{\"status\":\"ok\"}");
-
-  if (command == "forward") {
-    sendCommand(0x10);
-  } else if (command == "backward") {
-    sendCommand(0x11);
-  } else if (command == "left") {
-    sendCommand(0x12);
-  } else if (command == "right") {
-    sendCommand(0x13);
-  } else if (command == "stop") {
-    sendCommand(0x14);
-  } else {
-    Serial.println("Unknown command received via HTTP POST: " + command);
-  }
+  Serial.println(command);
+  if (command == "forward") sendCommand(0x10);
+  else if (command == "backward") sendCommand(0x11);
+  else if (command == "left") sendCommand(0x12);
+  else if (command == "right") sendCommand(0x13);
+  else if (command == "stop") sendCommand(0x14);
+  else Serial.println("Unknown command received via HTTP POST: " + command);
 }
-
-
 
 void handleOptions() {
   server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -96,13 +86,11 @@ void handleOptions() {
   server.send(204);
 }
 
-
-
 // ======================== Communication with Arduino ========================
 void sendCommand(uint8_t command) {
-  espArduino.write(command);
-  espArduino.flush();
-  delay(2); 
+  SerialCommunication.write(command);
+  SerialCommunication.flush();
+  delay(2);
   digitalWrite(COMMAND_SEND_PIN, HIGH);
   delay(10);
   digitalWrite(COMMAND_SEND_PIN, LOW);
@@ -111,18 +99,15 @@ void sendCommand(uint8_t command) {
 void getData() {
   sendCommand(0x00);
   unsigned long timeout = millis();
-  while (!arduinoEsp.available()) {
+  while (!SerialCommunication.available()) {
     if (millis() - timeout > 500) {
       sendCommand(0x23);
       return;
     }
   }
-  Serial.println("Started recieving the coomand");
-  inputString = arduinoEsp.readStringUntil('\n');
-  Serial.println("Raw input: " + inputString);
 
+  inputString = SerialCommunication.readStringUntil('\n');
   inputString.trim();
-
   parseData(inputString);
 }
 
@@ -144,12 +129,10 @@ void parseData(String data) {
 // ======================== Setup ========================
 void setup() {
   Serial.begin(115200);
-  arduinoEsp.begin(9600);
-  espArduino.begin(9600);
+  SerialCommunication.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN); // UART1 on ESP32
 
   pinMode(COMMAND_SEND_PIN, OUTPUT);
-  pinMode(DATA_REQUEST_PIN, OUTPUT);
-
+  digitalWrite(COMMAND_SEND_PIN, HIGH);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -169,7 +152,6 @@ void setup() {
 void loop() {
   static unsigned long lastWiFiCheck = 0;
   server.handleClient();
-
   if (millis() - lastWiFiCheck > 4000) {
     lastWiFiCheck = millis();
 
@@ -189,5 +171,5 @@ void loop() {
     }
   }
 
-  yield();
+  delay(1);  // Optional: light delay
 }
