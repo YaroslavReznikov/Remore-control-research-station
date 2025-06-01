@@ -4,10 +4,10 @@
 #include <LiquidCrystal_I2C.h>
 #include <SoftwareSerial.h>
 
-#define DHT_PIN 8
+#define DHT_PIN 13
 #define DHT_TYPE DHT11
 #define TRIG_PIN 12
-#define ECHO_PIN 13
+#define ECHO_PIN 10
 #define GAS_SENSOR_PIN A2
 #define LIGHT_SENSOR_PIN A3
 #define LIGHT_REF_RESISTOR 250
@@ -17,12 +17,12 @@
 #define REQUEST_PIN 3
 
 #define RIGHT_WHEEL_PWM 5
-#define RIGHT_PIN1 7
-#define RIGHT_PIN2 13
+#define RIGHT_PIN1 8
+#define RIGHT_PIN2 7
 
 #define LEFT_WHEEL_PWM 6
-#define LEFT_PIN1 A1
-#define LEFT_PIN2 A0
+#define LEFT_PIN1 A0
+#define LEFT_PIN2 A1
 
 #define MAXPWM 255
 #define MINPWM 150
@@ -45,7 +45,8 @@ int queueEnd = 0;
 bool motorBusy = false;
 unsigned long motorStartTime = 0;
 uint8_t currentMotorCommand;
-
+int currentCommand = 0;
+int nextCommandStored = 0;
 // ======================== Setup ========================
 void setupPins() {
   pinMode(LIGHT_SENSOR_PIN, INPUT);
@@ -77,7 +78,7 @@ void setup() {
   Serial.begin(4800);
   SerialCommunication.begin(9600);
   Serial.println("Program Started");
-  
+  moveForward();
 }
 
 // ======================== Main Loop ========================
@@ -86,22 +87,21 @@ void loop() {
     commandReceived = false;
     commandHandler();
   }
-
-  if (motorBusy && millis() - motorStartTime >= MOTOR_DURATION && queueStart == queueEnd) {
-    Serial.println("Finished doing motor command");
-    stopMotors();
-    motorBusy = false;
+  if (motorBusy){
+    if (millis() - motorStartTime >= MOTOR_DURATION)  {
+      stopMotors(); 
+      motorBusy = false;
+    }
   }
-
-  if ( queueStart != queueEnd && motorBusy && millis() - motorStartTime >= MOTOR_DURATION) {
+  if (!motorBusy &&  queueStart != queueEnd){
     currentMotorCommand = motorCommandQueue[queueStart];
     queueStart = (queueStart + 1) % MAX_QUEUE_SIZE;
     Serial.println("Staered doing new motor command");
     executeMotorCommand(currentMotorCommand);
+    motorStartTime = millis();
+    motorBusy = true;
   }
-
-
-  delay(1);
+  delay(5);
 }
 
 // ======================== Interrupt Handler ========================
@@ -118,7 +118,7 @@ void commandHandler() {
   switch (command & 0xF0) {
     case 0x00: sendSensorData(); break;
     case 0x10: handleMotorCommand(command); break;
-    case 0x20: handleLCDCommand(command); break;
+    case 0x20: executeLCDCommand(command); break;
     default: Serial.println("Unknown command");
   }
 }
@@ -155,33 +155,33 @@ void sendSensorData() {
                       String(distance) + "\n";
   SerialCommunication.print(dataString);
 }
-
 void handleMotorCommand(uint8_t command) {
-  if ((queueEnd + 1) % MAX_QUEUE_SIZE == queueStart) return;
-  motorCommandQueue[queueEnd] = command;
-  queueEnd = (queueEnd + 1) % MAX_QUEUE_SIZE;
+  if ((queueEnd + 1) % MAX_QUEUE_SIZE == queueStart){
+    Serial.println("Too many commands");
+    return;
+  } 
+    motorCommandQueue[queueEnd] = command;
+    queueEnd = (queueEnd +1)%MAX_QUEUE_SIZE;
 }
 
-void handleLCDCommand(uint8_t command) {
-  switch (command 0x0F) {
-    case 0x0: showInternetConnected(); break;
-    case 0x1: showInternetDisconnected(); break;
-    case 0x2: showErrorOnLCD(); break;
-    case 0x3: showDataErrorOnLCD(); break;
+void executeLCDCommand(uint8_t command) {
+  switch (command & 0x0F) {
+    case 0x00: showInternetConnected(); break;
+    case 0x01: showInternetDisconnected(); break;
+    case 0x02: showErrorOnLCD(); break;
+    case 0x03: showDataErrorOnLCD(); break;
     default: Serial.println("Unknown LCD command");
   }
 }
 
 // ======================== Motor Control ========================
 void executeMotorCommand(uint8_t command) {
-  motorStartTime = millis();
-  motorBusy = true;
   switch (command & 0x0F) {
-    case 0x0: moveForward(); break;
-    case 0x1: moveBackward(); break;
-    case 0x2: moveLeft(); break;
-    case 0x3: moveRight(); break;
-    case 0x4: stopMotors(); break;
+    case 0x00: moveForward(); break;
+    case 0x01: moveBackward(); break;
+    case 0x02: moveLeft(); break;
+    case 0x03: moveRight(); break;
+    case 0x04: stopMotors(); break;
   }
 }
 
