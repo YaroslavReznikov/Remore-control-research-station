@@ -53,12 +53,13 @@ const App = () => {
       <div className="controls-box">
         <h2 className="section-title">Movement Controls</h2>
         <div className="controls">
-          <button onClick={() => sendCommand("forward")} className="control-button">Forward</button>
+          <button onClick={() => sendCommand("forward")} className="control-button">↑</button>
           <div className="control-row">
-            <button onClick={() => sendCommand("left")} className="control-button">Left</button>
-            <button onClick={() => sendCommand("right")} className="control-button">Right</button>
+            <button onClick={() => sendCommand("left")} className="control-button">←</button>
+            <button onClick={() => sendCommand("stop")} className="control-button stop-button">⏹</button>
+            <button onClick={() => sendCommand("right")} className="control-button">→</button>
           </div>
-          <button onClick={() => sendCommand("back")} className="control-button">Back</button>
+          <button onClick={() => sendCommand("back")} className="control-button">↓</button>
         </div>
       </div>
     </div>
