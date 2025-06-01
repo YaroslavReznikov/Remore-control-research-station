@@ -63,19 +63,21 @@ code {
 }
 
 .controls {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.7rem;
+  gap: 2.5rem;
+  padding-top: 1.5rem;
 }
 
 .control-row {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .control-button {
-  font-size: 2rem;
+  font-size: 2.5rem;
   padding: 0;
   border: none;
   border-radius: 8px;
@@ -88,6 +90,7 @@ code {
   display: flex;
   justify-content: center;
   align-items: center;
+  line-height: 1;
 }
 
 .control-button:hover {
@@ -101,7 +104,7 @@ code {
 
 .stop-button {
   background-color: #dc3545;
-  margin: 0 1rem;
+  margin: 0 1.5rem;
 }
 
 .stop-button:hover {
@@ -122,9 +125,18 @@ code {
   }
   
   .control-button {
-    font-size: 1.8rem;
+    font-size: 2.2rem;
     width: 60px;
     height: 60px;
+  }
+
+  .controls {
+    gap: 2rem;
+    padding-top: 1rem;
+  }
+
+  .control-row {
+    gap: 1.2rem;
   }
 }
 
@@ -156,48 +168,80 @@ code {
   color: white;
 }
 
+.controls-and-queue {
+  display: flex;
+  gap: 4rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
 .queue-container {
-  margin-top: 2rem;
-  padding: 1.5rem;
+  flex-grow: 1;
+  max-width: 600px;
+  margin-top: 0;
+  padding: 0 1.5rem;
   background: white;
   border-radius: 15px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+.command-text {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 80px;
+  margin: 0;
+  padding: 0;
+}
+
 .queue-title {
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   color: #444;
-  margin-bottom: 1rem;
+  margin: 0;
+  line-height: 80px;
 }
 
 .queue-list {
-  display: flex;
-  flex-wrap: wrap;
+  padding: 1.5rem 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-auto-flow: row;
+  grid-auto-rows: 40px;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
+  min-height: calc(5 * (40px + 0.5rem));
 }
 
 .queue-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  position: relative;
   background-color: #f8f9fa;
-  padding: 0.5rem 1rem;
+  aspect-ratio: 1;
   border-radius: 8px;
   font-size: 1.2rem;
-}
-
-.command-text {
-  font-size: 1.4rem;
+  padding: 0;
+  height: 40px;
+  order: attr(data-index);
 }
 
 .remove-button {
+  position: absolute;
+  top: 0;
+  right: 0;
   background: none;
   border: none;
   color: #dc3545;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   cursor: pointer;
-  padding: 0 0.3rem;
+  padding: 0.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -223,18 +267,219 @@ code {
   background-color: #218838;
 }
 
-@media (max-width: 768px) {
-  .mode-button {
-    padding: 0.6rem 1.2rem;
-    font-size: 1rem;
+@media (max-width: 1200px) {
+  .controls-and-queue {
+    gap: 2rem;
   }
-
+  
+  .queue-container {
+    max-width: 500px;
+  }
+  
+  .queue-list {
+    grid-template-columns: repeat(8, 1fr);
+    min-height: calc(5 * (35px + 0.5rem));
+  }
+  
   .queue-item {
-    font-size: 1.1rem;
+    height: 35px;
+  }
+}
+
+@media (max-width: 768px) {
+  .controls-and-queue {
+    flex-direction: column;
+    align-items: center;
+    margin-top: 0;
+  }
+  
+  .queue-container {
+    width: 100%;
+    margin-top: 2rem;
+    padding: 1.5rem;
+  }
+  
+  .queue-list {
+    padding: 0;
+  }
+  
+  .queue-header {
+    height: auto;
+    margin-bottom: 1rem;
+  }
+  
+  .queue-title {
+    line-height: normal;
   }
 
-  .send-queue-button {
-    font-size: 1.1rem;
-    padding: 0.8rem;
+  .command-text {
+    font-size: 1.8rem;
+  }
+
+  .control-button {
+    font-size: 2.2rem;
+    width: 60px;
+    height: 60px;
+  }
+}
+
+.mode-button {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+}
+
+.sensor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.settings-button {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.settings-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.settings-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.settings-content h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.settings-group {
+  margin-bottom: 1.5rem;
+}
+
+.settings-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #666;
+}
+
+.settings-group select {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+}
+
+.settings-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.cancel-button,
+.save-button {
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cancel-button {
+  background: none;
+  border: 1px solid #ddd;
+  color: #666;
+}
+
+.cancel-button:hover {
+  background-color: #f5f5f5;
+}
+
+.save-button {
+  background-color: #007bff;
+  border: none;
+  color: white;
+}
+
+.save-button:hover {
+  background-color: #0056b3;
+}
+
+.settings-content {
+  width: 95%;
+  padding: 1.5rem;
+}
+
+.settings-group select {
+  padding: 0.6rem;
+}
+
+.cancel-button,
+.save-button {
+  padding: 0.6rem 1.2rem;
+}
+
+.queue-count {
+  font-size: 1.1rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.queue-limit-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1rem;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.control-button.disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.control-button.disabled:hover {
+  background-color: #ccc;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
