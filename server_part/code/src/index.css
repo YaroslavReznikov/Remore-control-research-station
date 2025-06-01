@@ -127,3 +127,114 @@ code {
     height: 60px;
   }
 }
+
+.mode-switch {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.mode-button {
+  padding: 0.8rem 1.5rem;
+  font-size: 1.1rem;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  background-color: white;
+  color: #007bff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-button.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.mode-button:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.queue-container {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.queue-title {
+  font-size: 1.4rem;
+  color: #444;
+  margin-bottom: 1rem;
+}
+
+.queue-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #f8f9fa;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 1.2rem;
+}
+
+.command-text {
+  font-size: 1.4rem;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  color: #dc3545;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-button:hover {
+  color: #c82333;
+}
+
+.send-queue-button {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.2rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.send-queue-button:hover {
+  background-color: #218838;
+}
+
+@media (max-width: 768px) {
+  .mode-button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+  }
+
+  .queue-item {
+    font-size: 1.1rem;
+  }
+
+  .send-queue-button {
+    font-size: 1.1rem;
+    padding: 0.8rem;
+  }
+}
