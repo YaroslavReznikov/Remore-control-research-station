@@ -158,11 +158,11 @@ void sendCommand(uint8_t command) {
 }
 
 void getData() {
-    sendCommand(0x00);
+    sendCommand(0x00);  
     unsigned long timeout = millis();
     while (!SerialCommunication.available()) {
         if (millis() - timeout > 500) {
-            sendCommand(0x23);
+            sendCommand(0x43);
             return;
         }
     }
@@ -183,7 +183,7 @@ void parseData(String data) {
         sensorData.gasLevel = data.substring(idx2 + 1, idx3).toFloat();
         sensorData.distance = data.substring(idx3 + 1).toFloat();
     } else {
-        sendCommand(0x23);  // notify arduino about data error
+        sendCommand(0x43);  // notify arduino about data error
     }
 }
 
@@ -195,7 +195,7 @@ void checkWiFiConnection() {
 
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("WiFi disconnected. Reconnecting...");
-            sendCommand(0x21);  // Notify Arduino about disconnection
+            sendCommand(0x41);  // Notify Arduino about disconnection
             WiFi.disconnect();
             WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -207,7 +207,7 @@ void checkWiFiConnection() {
 
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.println("WiFi reconnected!");
-                sendCommand(0x20);  // Notify Arduino about connection
+                sendCommand(0x40);  // Notify Arduino about connection
             }
         }
     }
@@ -218,7 +218,7 @@ void setup() {
     setupCommunication();
     setupWiFi();
     setupWebServer();
-    sendCommand(0x20);  // Notify Arduino about initial connection
+    sendCommand(0x40);  // Notify Arduino about initial connection
 }
 
 void loop() {

@@ -247,6 +247,7 @@ void handleEngineCommand(uint8_t command) {
 }
 
 void executeLCDCommand(uint8_t command) {
+  //use swith with and operator 
   switch (command & 0x0F) {
     case 0x00: showInternetConnected(); break;
     case 0x01: showInternetDisconnected(); break;
